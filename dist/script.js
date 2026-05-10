@@ -50,11 +50,39 @@ class BinauralThetaBeatPlayer {
     this._graphStarted = true
     const audioContext = new AudioContextCtor()
     this._audioContext = audioContext
-    const channelMerger = audioContext.createChannelMerger(2)
+
+    const isAppleTouch = (() => {
+      const ua = typeof navigator !== "undefined" ? navigator.userAgent || "" : ""
+      return (
+        /iPhone|iPod/i.test(ua) ||
+        /iPad/i.test(ua) ||
+        (typeof navigator !== "undefined" &&
+          navigator.platform === "MacIntel" &&
+          navigator.maxTouchPoints > 1)
+      )
+    })()
+    const isCoarseOnly = (() => {
+      try {
+        return window.matchMedia("(pointer: coarse)").matches && navigator.maxTouchPoints > 0
+      } catch (_) {
+        return false
+      }
+    })()
+    /** ChannelMerger → destination is unreliable on iOS; stereo panners mix correctly to destination. */
     const gainLeft = audioContext.createGain()
     const gainRight = audioContext.createGain()
-    gainLeft.gain.value = this._perChannelGainLinear
-    gainRight.gain.value = this._perChannelGainLinear
+    const perCh =
+      isAppleTouch || isCoarseOnly
+        ? Math.min(this._perChannelGainLinear * 1.45, 0.09)
+        : this._perChannelGainLinear
+    gainLeft.gain.value = perCh
+    gainRight.gain.value = perCh
+
+    const panLeft = audioContext.createStereoPanner()
+    const panRight = audioContext.createStereoPanner()
+    panLeft.pan.value = -1
+    panRight.pan.value = 1
+
     const oscLeft = audioContext.createOscillator()
     const oscRight = audioContext.createOscillator()
     oscLeft.type = "sine"
@@ -64,23 +92,39 @@ class BinauralThetaBeatPlayer {
     const beatOffsetHz = this._sampleBeatFrequencyHz()
     oscLeft.frequency.value = this.carrierFrequencyHz
     oscRight.frequency.value = this.carrierFrequencyHz + beatOffsetHz
-    oscLeft.connect(gainLeft)
-    oscRight.connect(gainRight)
-    gainLeft.connect(channelMerger, 0, 0)
-    gainRight.connect(channelMerger, 0, 1)
+
     const masterGain = audioContext.createGain()
     const rampStartTime = audioContext.currentTime
     masterGain.gain.value = 0
-    masterGain.gain.linearRampToValueAtTime(this.masterVolumeLinear, rampStartTime + 5)
-    channelMerger.connect(masterGain)
+    const rampSec = isAppleTouch ? 0.38 : isCoarseOnly ? 0.55 : 4.25
+    masterGain.gain.linearRampToValueAtTime(this.masterVolumeLinear, rampStartTime + rampSec)
+
+    oscLeft.connect(gainLeft)
+    gainLeft.connect(panLeft)
+    panLeft.connect(masterGain)
+    oscRight.connect(gainRight)
+    gainRight.connect(panRight)
+    panRight.connect(masterGain)
     masterGain.connect(audioContext.destination)
-    oscLeft.start()
-    oscRight.start()
+
     this._leftOscillator = oscLeft
     this._rightOscillator = oscRight
     this._outputGainNode = masterGain
-    audioContext.resume().catch(() => {})
-    this._queueNextBeatFrequencyDrift()
+
+    const runOscillatorsAndDrift = () => {
+      const t = audioContext.currentTime
+      try {
+        oscLeft.start(t)
+        oscRight.start(t)
+      } catch (_) {}
+      this._queueNextBeatFrequencyDrift()
+    }
+
+    if (audioContext.state === "running") {
+      runOscillatorsAndDrift()
+    } else {
+      audioContext.resume().then(runOscillatorsAndDrift).catch(runOscillatorsAndDrift)
+    }
   }
 
   /** Call from touch/UI so mobile Safari unsuspends the AudioContext. */
