@@ -363,8 +363,11 @@ function createFloatingControlPanel(canvasRenderer, thetaAudio) {
 
   panelRoot.innerHTML = `
     <div class="mb-1 flex w-full basis-full items-center justify-between gap-3 border-b border-white/5 pb-3">
-      <span class="text-[10px] font-semibold uppercase tracking-[0.2em] text-neutral-500">Controls</span>
-      <button type="button" id="hypno-panel-close" class="grid size-10 place-items-center rounded-xl border border-white/10 bg-gradient-to-br from-white/[0.07] to-transparent text-lg leading-none text-neutral-200 shadow-sm transition hover:border-violet-400/35 hover:from-violet-500/15 hover:text-white" aria-label="Close controls">×</button>
+      <div class="flex min-w-0 flex-col gap-1">
+        <span class="text-[10px] font-semibold uppercase tracking-[0.2em] text-neutral-500">Controls</span>
+        <a href="https://github.com/253153/hypnosis.io.lol" target="_blank" rel="noopener noreferrer" class="w-fit text-[10px] font-medium text-violet-400/90 underline-offset-2 hover:text-fuchsia-300 hover:underline">Source on GitHub</a>
+      </div>
+      <button type="button" id="hypno-panel-close" class="shrink-0 grid size-10 place-items-center rounded-xl border border-white/10 bg-gradient-to-br from-white/[0.07] to-transparent text-lg leading-none text-neutral-200 shadow-sm transition hover:border-violet-400/35 hover:from-violet-500/15 hover:text-white" aria-label="Close controls">×</button>
     </div>
     <h2 class="mt-1 w-full basis-full text-[10px] font-semibold uppercase tracking-[0.18em] text-neutral-500">Visual <span class="font-normal normal-case tracking-normal text-neutral-600">(any %)</span></h2>
     <div class="${fieldWrapClass}"><label class="${labelClass}"><span>Mouse warp</span><span class="text-[10px] text-neutral-500">%</span></label><div class="${rowClass}"><input type="range" id="cv-mouse" class="${inputRangeClass}" min="0" max="200" value="100" step="1"><input type="number" id="cv-mouse-num" class="${inputNumClass}" step="any" value="100"></div></div>
