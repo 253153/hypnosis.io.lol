@@ -11,6 +11,21 @@ const AUDIO_DETUNE_MAX_CENTS = 95
 const AUDIO_DETUNE_FROM_POINTER_SCALE = 0.055
 const AUDIO_DETUNE_CLICK_CENTS = 22
 
+function unlockWebAudioForMobile(thetaAudio, uiFeedbackSounds) {
+  thetaAudio.ensureStartedAndResume()
+  uiFeedbackSounds.ensureContext()
+  uiFeedbackSounds.resumeIfNeeded()
+}
+
+/** Pointer lock is unreliable on phones and breaks follow-up touches for some users. */
+function shouldUsePointerLockOnCanvas() {
+  try {
+    if (window.matchMedia("(pointer: coarse)").matches) return false
+    if (window.matchMedia("(hover: none)").matches && navigator.maxTouchPoints > 0) return false
+  } catch (_) {}
+  return true
+}
+
 class BinauralThetaBeatPlayer {
   constructor() {
     this._graphStarted = false
@@ -66,6 +81,16 @@ class BinauralThetaBeatPlayer {
     this._outputGainNode = masterGain
     audioContext.resume().catch(() => {})
     this._queueNextBeatFrequencyDrift()
+  }
+
+  /** Call from touch/UI so mobile Safari unsuspends the AudioContext. */
+  ensureStartedAndResume() {
+    if (!this._graphStarted) {
+      this.start()
+      return
+    }
+    const ctx = this._audioContext
+    if (ctx && ctx.state === "suspended") ctx.resume().catch(() => {})
   }
 
   _sampleBeatFrequencyHz() {
@@ -204,6 +229,53 @@ class BinauralThetaBeatPlayer {
   }
 }
 
+function bindDeviceMotionToRenderer(renderer) {
+  const tilt = renderer.deviceMotionTilt
+  const smooth = [0, 0, 0]
+  let listening = false
+  let inFlight = false
+  function onDeviceMotion(e) {
+    const a = e.accelerationIncludingGravity
+    if (!a) return
+    if (a.x == null && a.y == null && a.z == null) return
+    const nx = (a.x || 0) / 9.81
+    const ny = (a.y || 0) / 9.81
+    const nz = (a.z || 0) / 9.81
+    const b = 0.14
+    smooth[0] = smooth[0] * (1 - b) + nx * b
+    smooth[1] = smooth[1] * (1 - b) + ny * b
+    smooth[2] = smooth[2] * (1 - b) + nz * b
+    tilt[0] = Math.max(-1.4, Math.min(1.4, smooth[0]))
+    tilt[1] = Math.max(-1.4, Math.min(1.4, smooth[1]))
+    tilt[2] = Math.max(-1.4, Math.min(1.4, smooth[2]))
+  }
+  async function requestAndListen() {
+    if (listening || inFlight) return
+    inFlight = true
+    try {
+      if (typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function") {
+        try {
+          const r = await DeviceMotionEvent.requestPermission()
+          if (r !== "granted") return
+        } catch (_) {
+          return
+        }
+      }
+      if (!listening) {
+        listening = true
+        window.addEventListener("devicemotion", onDeviceMotion, { passive: true })
+      }
+    } finally {
+      inFlight = false
+    }
+  }
+  const tryHook = () => {
+    requestAndListen().catch(() => {})
+  }
+  document.addEventListener("pointerdown", tryHook, { capture: true })
+  document.addEventListener("touchstart", tryHook, { capture: true, passive: true })
+}
+
 /** Short sine blips for UI feedback (separate graph from binaural beats). */
 class GentleUiFeedbackSounds {
   constructor() {
@@ -220,6 +292,10 @@ class GentleUiFeedbackSounds {
     this._outputGain.gain.value = 0.085
     this._outputGain.connect(this._audioContext.destination)
     return this._audioContext
+  }
+
+  resumeIfNeeded() {
+    if (this._audioContext?.state === "suspended") this._audioContext.resume().catch(() => {})
   }
 
   /** @param {'slider' | 'number' | 'button'} kind */
@@ -348,13 +424,13 @@ function wireRangeAndNumberThroughMapping(
   syncFromRange()
 }
 
-function createFloatingControlPanel(canvasRenderer, thetaAudio) {
+function createFloatingControlPanel(canvasRenderer, thetaAudio, uiFeedbackSounds) {
   const panelRoot = document.createElement("div")
   panelRoot.id = "hypno-control-panel"
   panelRoot.className =
-    "is-hidden fixed inset-x-0 bottom-0 z-20 flex max-h-[46vh] flex-wrap content-end items-end gap-x-5 gap-y-2.5 overflow-y-auto border-t border-white/10 bg-neutral-950/80 px-4 pb-[max(14px,env(safe-area-inset-bottom))] pt-3 shadow-[0_-25px_50px_-12px_rgba(0,0,0,0.55)] backdrop-blur-2xl transition-[transform,opacity,visibility] duration-300 [box-shadow:inset_0_1px_0_0_rgba(255,255,255,0.06)]"
+    "touch-manipulation is-hidden fixed inset-x-0 bottom-0 z-20 flex max-h-[46vh] flex-wrap content-end items-end gap-x-5 gap-y-2.5 overflow-y-auto border-t border-white/10 bg-neutral-950/80 px-4 pb-[max(14px,env(safe-area-inset-bottom))] pt-3 shadow-[0_-25px_50px_-12px_rgba(0,0,0,0.55)] backdrop-blur-2xl transition-[transform,opacity,visibility] duration-300 [box-shadow:inset_0_1px_0_0_rgba(255,255,255,0.06)]"
   const inputRangeClass =
-    "h-1 min-h-1 w-0 min-w-0 flex-1 cursor-pointer accent-violet-500 hover:accent-fuchsia-400"
+    "min-h-11 min-w-0 w-0 flex-1 cursor-pointer touch-manipulation py-2 accent-violet-500 hover:accent-fuchsia-400 [touch-action:pan-y]"
   const inputNumClass =
     "w-[7.5rem] shrink-0 rounded-xl border border-white/10 bg-black/50 px-2.5 py-1.5 text-[11px] text-neutral-100 tabular-nums outline-none transition placeholder:text-neutral-600 focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/25"
   const fieldWrapClass = "flex min-w-[108px] flex-1 flex-col gap-1.5"
@@ -380,9 +456,14 @@ function createFloatingControlPanel(canvasRenderer, thetaAudio) {
     <h2 class="w-full basis-full text-[10px] font-semibold uppercase tracking-[0.18em] text-neutral-500">Sound <span class="font-normal normal-case tracking-normal text-neutral-600">(manual)</span></h2>
     <div class="${fieldWrapClass}"><label class="${labelClass}"><span>Volume</span><span class="text-[10px] text-neutral-500">%</span></label><div class="${rowClass}"><input type="range" id="aud-vol" class="${inputRangeClass}" min="0" max="100" value="92" step="1"><input type="number" id="aud-vol-num" class="${inputNumClass}" step="any" value="92"></div></div>
     <div class="${fieldWrapClass}"><label class="${labelClass}"><span>Carrier Hz</span><span class="text-[10px] text-neutral-500">&nbsp;</span></label><div class="${rowClass}"><input type="range" id="aud-carrier" class="${inputRangeClass}" min="100" max="320" value="174" step="1"><input type="number" id="aud-carrier-num" class="${inputNumClass}" step="any" value="174"></div></div>
-    <div class="${fieldWrapClass}"><label class="${labelClass}"><span>Theta beat Hz</span><span class="text-[10px] text-neutral-500">&nbsp;</span></label><div class="${rowClass}"><input type="range" id="aud-beat" class="${inputRangeClass}" min="400" max="800" value="600" step="5"><input type="number" id="aud-beat-num" class="${inputNumClass}" step="any" value="6"></div></div>
+    <div class="${fieldWrapClass}"><label class="${labelClass}"><span>Theta beat Hz</span><span class="text-[10px] text-neutral-500">&nbsp;</span></label><div class="${rowClass}"><input type="range" id="aud-beat" class="${inputRangeClass}" min="400" max="800" value="600" step="1"><input type="number" id="aud-beat-num" class="${inputNumClass}" step="any" value="6"></div></div>
   `
   document.body.appendChild(panelRoot)
+
+  const unlockFromPanel = () => unlockWebAudioForMobile(thetaAudio, uiFeedbackSounds)
+  panelRoot.addEventListener("pointerdown", unlockFromPanel, { capture: true })
+  panelRoot.addEventListener("touchstart", unlockFromPanel, { capture: true, passive: true })
+  panelRoot.addEventListener("input", unlockFromPanel, { capture: true })
 
   panelRoot.querySelector("#hypno-panel-close").addEventListener("click", () => {
     panelRoot.classList.add("is-hidden")
@@ -493,10 +574,11 @@ function bootstrapHypnosisExperience() {
   document.title = "Theta Hypnosis"
   document.body.innerHTML = ""
   document.body.appendChild(primaryCanvas)
-  document.body.style = "margin:0;touch-action:none;overflow:hidden"
+  document.body.style = "margin:0;overflow:hidden"
   primaryCanvas.style.width = "100%"
   primaryCanvas.style.height = "auto"
   primaryCanvas.style.userSelect = "none"
+  primaryCanvas.style.touchAction = "none"
   canvasRenderer = new HypnoticWebGLCanvasRenderer(primaryCanvas, devicePixelRatioClamped)
   canvasRenderer.buildShaderProgramFromSources()
   canvasRenderer.uploadFullscreenTriangleGeometry()
@@ -509,7 +591,8 @@ function bootstrapHypnosisExperience() {
   const thetaAudio = new BinauralThetaBeatPlayer()
   const uiFeedbackSounds = new GentleUiFeedbackSounds()
 
-  createFloatingControlPanel(canvasRenderer, thetaAudio)
+  createFloatingControlPanel(canvasRenderer, thetaAudio, uiFeedbackSounds)
+  bindDeviceMotionToRenderer(canvasRenderer)
 
   const panelRevealButton = document.createElement("button")
   panelRevealButton.id = "hypno-panel-toggle"
@@ -522,6 +605,7 @@ function bootstrapHypnosisExperience() {
   const floatingPanel = document.getElementById("hypno-control-panel")
   attachUiInteractionSounds(floatingPanel, uiFeedbackSounds)
   panelRevealButton.addEventListener("click", () => {
+    unlockWebAudioForMobile(thetaAudio, uiFeedbackSounds)
     uiFeedbackSounds.play("button")
     releaseDocumentPointerLockIfActive()
     floatingPanel?.classList.remove("is-hidden")
@@ -570,7 +654,7 @@ function bootstrapHypnosisExperience() {
   let hasLastFreePointerSample = false
 
   const runSyntheticPointerDownAtCurrentTarget = () => {
-    thetaAudio.start()
+    thetaAudio.ensureStartedAndResume()
     lastPointerActivityMs = performance.now()
     canvasRenderer.applyPointerDownKick()
     thetaAudio.nudgeDetuneFromPointerImpulse()
@@ -583,7 +667,7 @@ function bootstrapHypnosisExperience() {
 
   document.addEventListener("mousemove", (event) => {
     if (document.pointerLockElement !== primaryCanvas) return
-    thetaAudio.start()
+    thetaAudio.ensureStartedAndResume()
     lastPointerActivityMs = performance.now()
     const minSide = Math.min(primaryCanvas.width, primaryCanvas.height)
     const pointerSensitivity = POINTER_LOCK_POINTER_SENSITIVITY / minSide
@@ -604,7 +688,7 @@ function bootstrapHypnosisExperience() {
 
   primaryCanvas.addEventListener("pointermove", (event) => {
     if (document.pointerLockElement === primaryCanvas) return
-    thetaAudio.start()
+    thetaAudio.ensureStartedAndResume()
     lastPointerActivityMs = performance.now()
     if (hasLastFreePointerSample) {
       thetaAudio.nudgeDetuneFromPointerMotion(
@@ -622,7 +706,7 @@ function bootstrapHypnosisExperience() {
     hasLastFreePointerSample = false
   })
   primaryCanvas.addEventListener("pointerdown", (event) => {
-    thetaAudio.start()
+    thetaAudio.ensureStartedAndResume()
     lastPointerActivityMs = performance.now()
     hasLastFreePointerSample = true
     lastFreePointerClientX = event.clientX
@@ -633,14 +717,16 @@ function bootstrapHypnosisExperience() {
     canvasRenderer.setNormalizedPointerFromUv(pointerLockedNormalizedCoords)
     canvasRenderer.applyPointerDownKick()
     thetaAudio.nudgeDetuneFromPointerImpulse()
-    requestPointerLockOnCanvas()
+    if (shouldUsePointerLockOnCanvas()) {
+      requestPointerLockOnCanvas()
+    }
   })
 
   primaryCanvas.addEventListener(
     "wheel",
     (event) => {
       event.preventDefault()
-      thetaAudio.start()
+      thetaAudio.ensureStartedAndResume()
       lastPointerActivityMs = performance.now()
       canvasRenderer.applyWheelZoomDelta(event.deltaY)
       thetaAudio.nudgeDetuneFromWheel(event.deltaY)
@@ -675,7 +761,7 @@ function bootstrapHypnosisExperience() {
 class HypnoticWebGLCanvasRenderer {
   #passthroughVertexGlsl = "#version 300 es\nprecision highp float;\nin vec4 position;\nvoid main(){gl_Position=position;}"
   #gradientFallbackFragmentGlsl =
-    "#version 300 es\nprecision highp float;\nout vec4 O;\nuniform float uTimeSeconds;\nuniform vec2 uCanvasResolution;\nuniform float uFractalZoom;\nvoid main() {\n\tvec2 uv=(gl_FragCoord.xy-.5*uCanvasResolution)/min(uCanvasResolution.x,uCanvasResolution.y);\n\tuv/=max(1e-4,uFractalZoom);\n\tO=vec4(uv,sin(uTimeSeconds)*.5+.5,1);\n}"
+    "#version 300 es\nprecision highp float;\nout vec4 O;\nuniform float uTimeSeconds;\nuniform vec2 uCanvasResolution;\nuniform float uFractalZoom;\nuniform vec3 uDeviceTilt;\nvoid main() {\n\tvec2 uv=(gl_FragCoord.xy-.5*uCanvasResolution)/min(uCanvasResolution.x,uCanvasResolution.y);\n\tuv/=max(1e-4,uFractalZoom);\n\tuv+=uDeviceTilt.xy*0.04;\n\tO=vec4(uv,sin(uTimeSeconds)*.5+.5,1);\n}"
   #fullscreenTrianglePositions = [-1, 1, -1, -1, 1, 1, 1, -1]
 
   constructor(canvasElement, backingScaleMultiplier) {
@@ -695,6 +781,7 @@ class HypnoticWebGLCanvasRenderer {
     this.pointerDownSpinBoost = 1
     /** User scroll zoom: 1 = default; larger = further into the pattern. */
     this.fractalWheelZoom = 1
+    this.deviceMotionTilt = new Float32Array(3)
   }
 
   /** @param {number} deltaY - wheel `deltaY` (positive ≈ scroll down). */
@@ -818,6 +905,7 @@ class HypnoticWebGLCanvasRenderer {
     gpuProgram.uActivePointerCount = gl.getUniformLocation(gpuProgram, "uActivePointerCount")
     gpuProgram.uMultiTouchPackedUv = gl.getUniformLocation(gpuProgram, "uMultiTouchPackedUv")
     gpuProgram.uFractalZoom = gl.getUniformLocation(gpuProgram, "uFractalZoom")
+    gpuProgram.uDeviceTilt = gl.getUniformLocation(gpuProgram, "uDeviceTilt")
   }
 
   drawFrame(nowMs = 0) {
@@ -838,6 +926,9 @@ class HypnoticWebGLCanvasRenderer {
     gl.uniform1i(gpuProgram.uActivePointerCount, activePointerCount)
     gl.uniform2fv(gpuProgram.uMultiTouchPackedUv, multiTouchPackedCoords)
     gl.uniform1f(gpuProgram.uFractalZoom, this.fractalWheelZoom)
+    if (gpuProgram.uDeviceTilt) {
+      gl.uniform3fv(gpuProgram.uDeviceTilt, this.deviceMotionTilt)
+    }
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
   }
 }

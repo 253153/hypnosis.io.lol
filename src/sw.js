@@ -1,5 +1,5 @@
 /* global self, caches */
-const CACHE_NAME = "theta-hypnosis-static-v1"
+const CACHE_NAME = "theta-hypnosis-static-v2"
 
 const PRECACHE_URLS = [
   "./",

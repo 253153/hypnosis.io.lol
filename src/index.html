@@ -107,6 +107,9 @@
       }
     </script>
     <style>
+      #hypno-control-panel {
+        touch-action: manipulation;
+      }
       #hypno-control-panel.is-hidden {
         transform: translateY(110%);
         opacity: 0;
@@ -129,6 +132,7 @@ uniform float uClickHighlight;
 uniform float uSpinMomentum;
 uniform vec4 uVisualIntensityScales;
 uniform float uFractalZoom;
+uniform vec3 uDeviceTilt;
 #define FC gl_FragCoord.xy
 #define R uCanvasResolution
 #define T (uTimeSeconds+2.5)
@@ -207,6 +211,10 @@ void main(void) {
 	float fl=uVisualIntensityScales.w;
 	vec2 uv=(FC-.5*R)/min(R.x,R.y);
 	uv/=max(1e-4,uFractalZoom);
+	uv+=uDeviceTilt.xy*0.065*(0.62+mx);
+	float dmt=uDeviceTilt.z*0.048*(0.62+mx);
+	float dmc=cos(dmt), dms=sin(dmt);
+	uv=mat2(dmc,-dms,dms,dmc)*uv;
 	vec2 m=uNormalizedPointer;
 	float mi=length(m);
 	float mouseAmt=S(.001,.35,mi)*mx;
@@ -250,6 +258,6 @@ void main(void) {
 	col*=1.+P*2.8*fl;
 	O=vec4(col,1);
 }</script>
-    <script src="./script.js?v=13"></script>
+    <script src="./script.js?v=14"></script>
   </body>
 </html>
