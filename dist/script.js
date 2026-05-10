@@ -50,39 +50,11 @@ class BinauralThetaBeatPlayer {
     this._graphStarted = true
     const audioContext = new AudioContextCtor()
     this._audioContext = audioContext
-
-    const isAppleTouch = (() => {
-      const ua = typeof navigator !== "undefined" ? navigator.userAgent || "" : ""
-      return (
-        /iPhone|iPod/i.test(ua) ||
-        /iPad/i.test(ua) ||
-        (typeof navigator !== "undefined" &&
-          navigator.platform === "MacIntel" &&
-          navigator.maxTouchPoints > 1)
-      )
-    })()
-    const isCoarseOnly = (() => {
-      try {
-        return window.matchMedia("(pointer: coarse)").matches && navigator.maxTouchPoints > 0
-      } catch (_) {
-        return false
-      }
-    })()
-    /** ChannelMerger → destination is unreliable on iOS; stereo panners mix correctly to destination. */
+    const channelMerger = audioContext.createChannelMerger(2)
     const gainLeft = audioContext.createGain()
     const gainRight = audioContext.createGain()
-    const perCh =
-      isAppleTouch || isCoarseOnly
-        ? Math.min(this._perChannelGainLinear * 1.45, 0.09)
-        : this._perChannelGainLinear
-    gainLeft.gain.value = perCh
-    gainRight.gain.value = perCh
-
-    const panLeft = audioContext.createStereoPanner()
-    const panRight = audioContext.createStereoPanner()
-    panLeft.pan.value = -1
-    panRight.pan.value = 1
-
+    gainLeft.gain.value = this._perChannelGainLinear
+    gainRight.gain.value = this._perChannelGainLinear
     const oscLeft = audioContext.createOscillator()
     const oscRight = audioContext.createOscillator()
     oscLeft.type = "sine"
@@ -92,39 +64,23 @@ class BinauralThetaBeatPlayer {
     const beatOffsetHz = this._sampleBeatFrequencyHz()
     oscLeft.frequency.value = this.carrierFrequencyHz
     oscRight.frequency.value = this.carrierFrequencyHz + beatOffsetHz
-
+    oscLeft.connect(gainLeft)
+    oscRight.connect(gainRight)
+    gainLeft.connect(channelMerger, 0, 0)
+    gainRight.connect(channelMerger, 0, 1)
     const masterGain = audioContext.createGain()
     const rampStartTime = audioContext.currentTime
     masterGain.gain.value = 0
-    const rampSec = isAppleTouch ? 0.38 : isCoarseOnly ? 0.55 : 4.25
-    masterGain.gain.linearRampToValueAtTime(this.masterVolumeLinear, rampStartTime + rampSec)
-
-    oscLeft.connect(gainLeft)
-    gainLeft.connect(panLeft)
-    panLeft.connect(masterGain)
-    oscRight.connect(gainRight)
-    gainRight.connect(panRight)
-    panRight.connect(masterGain)
+    masterGain.gain.linearRampToValueAtTime(this.masterVolumeLinear, rampStartTime + 5)
+    channelMerger.connect(masterGain)
     masterGain.connect(audioContext.destination)
-
+    oscLeft.start()
+    oscRight.start()
     this._leftOscillator = oscLeft
     this._rightOscillator = oscRight
     this._outputGainNode = masterGain
-
-    const runOscillatorsAndDrift = () => {
-      const t = audioContext.currentTime
-      try {
-        oscLeft.start(t)
-        oscRight.start(t)
-      } catch (_) {}
-      this._queueNextBeatFrequencyDrift()
-    }
-
-    if (audioContext.state === "running") {
-      runOscillatorsAndDrift()
-    } else {
-      audioContext.resume().then(runOscillatorsAndDrift).catch(runOscillatorsAndDrift)
-    }
+    audioContext.resume().catch(() => {})
+    this._queueNextBeatFrequencyDrift()
   }
 
   /** Call from touch/UI so mobile Safari unsuspends the AudioContext. */
@@ -474,12 +430,13 @@ function createFloatingControlPanel(canvasRenderer, thetaAudio, uiFeedbackSounds
   panelRoot.className =
     "touch-manipulation is-hidden fixed inset-x-0 bottom-0 z-20 flex max-h-[46vh] flex-wrap content-end items-end gap-x-5 gap-y-2.5 overflow-y-auto border-t border-white/10 bg-neutral-950/80 px-4 pb-[max(14px,env(safe-area-inset-bottom))] pt-3 shadow-[0_-25px_50px_-12px_rgba(0,0,0,0.55)] backdrop-blur-2xl transition-[transform,opacity,visibility] duration-300 [box-shadow:inset_0_1px_0_0_rgba(255,255,255,0.06)]"
   const inputRangeClass =
-    "min-h-11 min-w-0 w-0 flex-1 cursor-pointer touch-manipulation py-2 accent-violet-500 hover:accent-fuchsia-400 [touch-action:pan-y]"
+    "hypno-range box-border w-full min-h-[48px] cursor-pointer touch-manipulation sm:min-h-[44px] sm:flex-1 sm:min-w-0"
   const inputNumClass =
-    "w-[7.5rem] shrink-0 rounded-xl border border-white/10 bg-black/50 px-2.5 py-1.5 text-[11px] text-neutral-100 tabular-nums outline-none transition placeholder:text-neutral-600 focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/25"
-  const fieldWrapClass = "flex min-w-[108px] flex-1 flex-col gap-1.5"
+    "box-border w-full rounded-xl border border-white/10 bg-black/50 px-3 py-2.5 text-[13px] text-neutral-100 tabular-nums outline-none transition placeholder:text-neutral-600 focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/25 sm:w-[7.5rem] sm:shrink-0 sm:py-1.5 sm:text-[11px]"
+  const fieldWrapClass = "flex w-full min-w-0 flex-1 basis-full flex-col gap-1.5 sm:min-w-[108px] sm:basis-auto"
   const labelClass = "flex items-baseline justify-between gap-2 text-[11px] text-neutral-300"
-  const rowClass = "flex w-full items-center gap-2.5"
+  const rowClass =
+    "flex w-full flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:gap-2.5"
 
   panelRoot.innerHTML = `
     <div class="mb-1 flex w-full basis-full items-center justify-between gap-3 border-b border-white/5 pb-3">

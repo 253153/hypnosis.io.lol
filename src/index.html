@@ -110,6 +110,69 @@
       #hypno-control-panel {
         touch-action: manipulation;
       }
+      /* iOS Safari: native range hit targets are tiny unless thumb/track are styled. */
+      #hypno-control-panel input.hypno-range {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 100%;
+        min-height: 48px;
+        margin: 0;
+        padding: 10px 0;
+        background: transparent;
+        touch-action: pan-x;
+      }
+      #hypno-control-panel input.hypno-range:focus {
+        outline: none;
+      }
+      #hypno-control-panel input.hypno-range:focus-visible {
+        outline: 2px solid rgba(167, 139, 250, 0.7);
+        outline-offset: 4px;
+        border-radius: 8px;
+      }
+      #hypno-control-panel input.hypno-range::-webkit-slider-runnable-track {
+        height: 10px;
+        border-radius: 5px;
+        background: rgba(255, 255, 255, 0.14);
+      }
+      #hypno-control-panel input.hypno-range::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 32px;
+        height: 32px;
+        margin-top: -11px;
+        border-radius: 50%;
+        background: linear-gradient(165deg, #ddd6fe 0%, #7c3aed 55%, #5b21b6 100%);
+        border: 2px solid rgba(255, 255, 255, 0.45);
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.45);
+      }
+      #hypno-control-panel input.hypno-range::-moz-range-track {
+        height: 10px;
+        border-radius: 5px;
+        background: rgba(255, 255, 255, 0.14);
+      }
+      #hypno-control-panel input.hypno-range::-moz-range-thumb {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        border: 2px solid rgba(255, 255, 255, 0.45);
+        background: #7c3aed;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.45);
+      }
+      @media (min-width: 640px) {
+        #hypno-control-panel input.hypno-range {
+          min-height: 44px;
+          padding: 8px 0;
+        }
+        #hypno-control-panel input.hypno-range::-webkit-slider-thumb {
+          width: 26px;
+          height: 26px;
+          margin-top: -8px;
+        }
+        #hypno-control-panel input.hypno-range::-moz-range-thumb {
+          width: 24px;
+          height: 24px;
+        }
+      }
       #hypno-control-panel.is-hidden {
         transform: translateY(110%);
         opacity: 0;
