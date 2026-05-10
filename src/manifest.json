@@ -1,0 +1,32 @@
+{
+  "name": "Theta Hypnosis — Brainwave entrainment",
+  "short_name": "Theta Hypnosis",
+  "description": "Induce a deep hypnotic state with this customizable brainwave entrainment app. Features synchronized visual stimuli and adjustable Theta (4-8 Hz) audio. Fine-tune the parameters to create your perfect trance or meditation experience.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#070510",
+  "theme_color": "#5b21b6",
+  "categories": ["health", "lifestyle", "music"],
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-384.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

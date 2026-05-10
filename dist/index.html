@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Theta Hypnosis — Brainwave entrainment &amp; fractals</title>
+    <meta
+      name="description"
+      content="Induce a deep hypnotic state with this customizable brainwave entrainment app. Features synchronized visual stimuli and adjustable Theta (4-8 Hz) audio. Fine-tune the parameters to create your perfect trance or meditation experience."
+    >
+    <meta
+      name="keywords"
+      content="hypnosis, brainwave entrainment, binaural beats, theta waves, meditation, fractal visuals, WebGL, mindfulness, trance, audio visual"
+    >
+    <meta name="author" content="Theta Hypnosis">
+    <meta name="creator" content="Theta Hypnosis">
+    <meta name="publisher" content="Theta Hypnosis">
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+    <meta name="googlebot" content="index, follow">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <meta name="theme-color" content="#5b21b6">
+    <meta name="color-scheme" content="dark">
+    <meta name="application-name" content="Theta Hypnosis">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Theta Hypnosis">
+    <meta name="format-detection" content="telephone=no">
+    <meta name="msapplication-TileColor" content="#5b21b6">
+    <meta name="msapplication-navbutton-color" content="#5b21b6">
+
+    <link rel="canonical" href="./" id="theta-canonical">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Theta Hypnosis">
+    <meta
+      property="og:title"
+      content="Theta Hypnosis — Brainwave entrainment &amp; fractals"
+    >
+    <meta
+      property="og:description"
+      content="Induce a deep hypnotic state with this customizable brainwave entrainment app. Features synchronized visual stimuli and adjustable Theta (4-8 Hz) audio. Fine-tune the parameters to create your perfect trance or meditation experience."
+    >
+    <meta property="og:url" content="./" id="theta-og-url">
+    <meta property="og:image" content="./icons/og-image.png" id="theta-og-image">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:type" content="image/png">
+    <meta
+      property="og:image:alt"
+      content="Theta Hypnosis — brainwave entrainment with fractal visuals and theta audio"
+    >
+    <meta property="og:locale" content="en_US">
+
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Theta Hypnosis — Brainwave entrainment &amp; fractals">
+    <meta
+      name="twitter:description"
+      content="Induce a deep hypnotic state with this customizable brainwave entrainment app. Features synchronized visual stimuli and adjustable Theta (4-8 Hz) audio. Fine-tune the parameters to create your perfect trance or meditation experience."
+    >
+    <meta name="twitter:image" content="./icons/og-image.png" id="theta-twitter-image">
+
+    <link rel="manifest" href="./manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="./icons/icon-512.png">
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Theta Hypnosis",
+        "description": "Induce a deep hypnotic state with this customizable brainwave entrainment app. Features synchronized visual stimuli and adjustable Theta (4-8 Hz) audio. Fine-tune the parameters to create your perfect trance or meditation experience.",
+        "applicationCategory": "HealthApplication",
+        "operatingSystem": "Web Browser",
+        "browserRequirements": "Requires JavaScript. WebGL 2 and Web Audio API recommended.",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+      }
+    </script>
+
+    <script>
+      ;(function () {
+        try {
+          var pageUrl = location.href.split("#")[0]
+          var c = document.getElementById("theta-canonical")
+          if (c) c.setAttribute("href", pageUrl)
+          var u = document.getElementById("theta-og-url")
+          if (u) u.setAttribute("content", pageUrl)
+          var ogAbs = new URL("./icons/og-image.png", pageUrl).href
+          var ogImg = document.getElementById("theta-og-image")
+          if (ogImg) ogImg.setAttribute("content", ogAbs)
+          var tw = document.getElementById("theta-twitter-image")
+          if (tw) tw.setAttribute("content", ogAbs)
+        } catch (_) {}
+      })()
+    </script>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ["ui-sans-serif", "system-ui", "Segoe UI", "Roboto", "sans-serif"],
+            },
+          },
+        },
+      }
+    </script>
+    <style>
+      #hypno-control-panel.is-hidden {
+        transform: translateY(110%);
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <script type="x-shader/x-fragment">#version 300 es
+/*********
+* made by Matthias Hurrle (@atzedent)
+*/
+precision highp float;
+out vec4 O;
+uniform float uTimeSeconds;
+uniform vec2 uCanvasResolution;
+uniform vec2 uNormalizedPointer;
+uniform float uClickHighlight;
+uniform float uSpinMomentum;
+uniform vec4 uVisualIntensityScales;
+uniform float uFractalZoom;
+#define FC gl_FragCoord.xy
+#define R uCanvasResolution
+#define T (uTimeSeconds+2.5)
+#define S smoothstep
+#define hue(a) (.6+.6*cos(6.3*(a)+vec3(0,83,21)))
+void pR(inout vec2 p, float a) {
+	p=cos(a)*p+sin(a)*vec2(-p.y,p.x);}
+float poly(vec2 p, float n) {
+	float
+	a=atan(p.x,p.y),
+	b=6.28318/n;
+	return cos(floor(.5+a/b)*b-a)*length(p);
+}
+vec3 pattern0(vec2 uv) {
+	vec2 p=uv*3.;
+	vec3 col=vec3(0);
+	for (float i=.0; i++<4.;) {
+		pR(p,.785398);
+		p=fract(p)-.5;
+		float d=length(p*p);
+		d=sin(12.*d+i*T*.5)*.62;
+		d=abs(d);
+		col+=pow(.05/d,1.2)*hue(dot(p,uv)*i+T*.2);
+	}
+	return col;
+}
+vec3 pattern1(vec2 uv) {
+	vec2 p=uv*2.;
+	vec3 col=vec3(0);
+	for (float i=.0; i++<4.;) {
+		pR(p,.785398);
+		p=fract(p)-.5;
+		float d=length(p);
+		d=sin(14.*d+T)*.8;
+		d=abs(d);
+		col+=(.05/d)*hue(dot(uv,uv)+i*.125+T*.2);
+		p*=1.618;
+	}
+	return col;
+}
+vec3 pattern2(vec2 uv) {
+	vec2 p=uv*1.5;
+  vec3 col = vec3(0);
+  const float n = 3.5;
+  for (float i = .0; i < 6.; i++) {
+    p *= 2.;
+    p = p-n*clamp(round(p/n), -1.,1.);
+    float d = exp(-length(p*.2));
+    d = log(1e-5*d);
+    d = pow(sin(d*20.+T*1.4), 2.)*.125;
+    d = abs(d);
+    d = pow(5e-3/d, .25);
+    col += d * hue(-length(uv)+i*.1-T*.7);
+    col = pow(col, vec3(1.28));
+  }
+  col *= exp(-125e-5*(length(uv)));
+  col = pow(S(.0, 20.,col), vec3(.4545));
+  return col;
+}
+vec3 pattern3(vec2 uv) {
+	vec2 p=uv*.25;
+	vec3 col=vec3(0);
+	for (float i=.0; i<5.; i++) {
+		p=fract(p*2.05)-.5;
+		float d=poly(p,8.)/(.25+dot(p,p));
+		d=sin(d*9.+T+i)*.25;
+		d=abs(d);
+		col+=.02/d*hue(length(uv)+i*.125-T*.125);
+	}
+	return col;
+}
+void main(void) {
+	float mx=uVisualIntensityScales.x;
+	float ck=uVisualIntensityScales.y;
+	float sp=uVisualIntensityScales.z;
+	float fl=uVisualIntensityScales.w;
+	vec2 uv=(FC-.5*R)/min(R.x,R.y);
+	uv/=max(1e-4,uFractalZoom);
+	vec2 m=uNormalizedPointer;
+	float mi=length(m);
+	float mouseAmt=S(.001,.35,mi)*mx;
+	float ang=(dot(m,uv)*7.+mi*12.+T*.45)*(1.+mouseAmt);
+	float cs=cos(ang),sn=sin(ang);
+	uv=mat2(cs,-sn,sn,cs)*uv;
+	float pull=exp(-length(uv-m)*2.8)*.72*mouseAmt;
+	uv+=(uv-m)*pull*(.5+.38*sin(T*4.3+mi*13.));
+	float zoom=1.+(.4*sin(mi*15.+T*2.1)+.28*S(.001,.35,mi))*mx;
+	uv*=zoom;
+	float P=uClickHighlight*ck;
+	float spin=uSpinMomentum*sp+P*(sin(T*72.)*16.+cos(T*59.)*13.);
+	cs=cos(spin); sn=sin(spin);
+	uv=mat2(cs,-sn,sn,cs)*uv;
+	uv*=1.+P*(2.6+2.1*sin(T*88.));
+	uv+=vec2(P*sin(T*130.+uv.y*40.),P*cos(T*118.+uv.x*38.))*.22;
+	vec3 col=pattern1(uv);
+	float proc=T*.1+uSpinMomentum*sp*.1+P*22.*sin(T*102.);
+	int pre =int(floor(mod(proc+.5,4.)));
+	switch (pre) {
+		case 0: proc-=abs(abs(uv.x)-abs(uv.y))*.2; break;
+		case 1: proc-=max(abs(uv.x),abs(uv.y))*.2; break;
+		case 2: proc-=length(uv)*.2; break;
+		case 3: proc-=min(abs(uv.x),abs(uv.y))*.2; break;
+	}
+	int scene=int(floor(mod(proc,4.)));
+	switch (scene) {
+		case 0: col=pattern0(uv); break;
+		case 1: col=pattern1(uv); break;
+		case 2: col=pattern2(uv); break;
+		case 3: col=pattern3(uv); break;
+	}
+	float chaos=P;
+	vec3 jackpot=.25*(pattern0(uv*(1.+chaos*.85))+pattern1(uv*(1.-chaos*.55))
+		+pattern2(uv*(1.35+chaos*.6))+pattern3(uv*(.55+chaos*.65)));
+	col=mix(col,jackpot,min(.98,.15+P*.98));
+	vec3 flash=hue(P*40.+T*15.);
+	col=mix(col,flash,P*.35);
+	col.r=mix(col.r,col.r*1.55+.14*sin(P*40.+T*22.),P*.75);
+	col.b=mix(col.b,col.b*1.62+.1*cos(P*36.+T*19.),P*.72);
+	col*=1.+P*2.8*fl;
+	O=vec4(col,1);
+}</script>
+    <script src="./script.js?v=12"></script>
+  </body>
+</html>
